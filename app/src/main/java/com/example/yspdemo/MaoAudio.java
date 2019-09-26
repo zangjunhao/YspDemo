@@ -1,10 +1,13 @@
 package com.example.yspdemo;
 
+import android.content.Context;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
+import android.media.MediaPlayer;
 import android.media.MediaRecorder;
+import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
 
@@ -25,6 +28,7 @@ public class MaoAudio {
     private boolean isRecording;
     File file;
     private int audioSize;
+    private static final String TAG = "maff";
 
     private static MaoAudio singleAudio = new MaoAudio();
 
@@ -54,6 +58,15 @@ public class MaoAudio {
 
     public void stop() {
         isRecording = false;
+    }
+
+    public void mediaPlay(Context context){
+        File wavFile = new File(file, "audio.wav");
+        if(wavFile.exists()){
+            Log.d(TAG, "mediaPlay: ");
+            MediaPlayer mediaPlayer = MediaPlayer.create(context, Uri.fromFile(wavFile));
+            mediaPlayer.start();
+        }
     }
 
     public void play() {
@@ -155,6 +168,7 @@ public class MaoAudio {
                     audioRecord.stop();
                     audioRecord.release();
                     outputStream.close();
+                    createWavFile(child);
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -164,4 +178,89 @@ public class MaoAudio {
         }).start();
     }
 
+    private void createWavFile(File pcmFile) {
+        try {
+            File wavFile = new File(file, "audio.wav");
+            if(wavFile.exists()){
+                wavFile.delete();
+            }
+            wavFile.createNewFile();
+            FileInputStream in = new FileInputStream(pcmFile);
+            FileOutputStream out = new FileOutputStream(wavFile);
+            long audioLength = in.getChannel().size();//ChunkSize数据大小
+            long audioDataLength = audioLength + 36;//加上wav头文件的大小
+            //写入头文件
+            WriteWaveFileHeader(out, audioLength, audioDataLength, 44100, AudioFormat.CHANNEL_OUT_MONO, 16 * 44100 * AudioFormat.CHANNEL_OUT_MONO / 8);
+            byte[] bytes = new byte[audioSize];
+            while (in.read(bytes) != -1) {
+                out.write(bytes);
+            }
+            in.close();
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void WriteWaveFileHeader(FileOutputStream out, long totalAudioLen, long totalDataLen, long longSampleRate, int channels, long byteRate) {
+        byte[] header = new byte[44];
+        header[0] = 'R'; // RIFF
+        header[1] = 'I';
+        header[2] = 'F';
+        header[3] = 'F';
+        header[4] = (byte) (totalDataLen & 0xff);//数据大小
+        header[5] = (byte) ((totalDataLen >> 8) & 0xff);
+        header[6] = (byte) ((totalDataLen >> 16) & 0xff);
+        header[7] = (byte) ((totalDataLen >> 24) & 0xff);
+        header[8] = 'W';//WAVE
+        header[9] = 'A';
+        header[10] = 'V';
+        header[11] = 'E';
+        //FMT Chunk
+        header[12] = 'f'; // 'fmt '
+        header[13] = 'm';
+        header[14] = 't';
+        header[15] = ' ';//过渡字节
+        //数据大小
+        header[16] = 16; // 4 bytes: size of 'fmt ' chunk
+        header[17] = 0;
+        header[18] = 0;
+        header[19] = 0;
+        //编码方式 10H为PCM编码格式
+        header[20] = 1; // format = 1
+        header[21] = 0;
+        //通道数
+        header[22] = (byte) channels;
+        header[23] = 0;
+        //采样率，每个通道的播放速度
+        header[24] = (byte) (longSampleRate & 0xff);
+        header[25] = (byte) ((longSampleRate >> 8) & 0xff);
+        header[26] = (byte) ((longSampleRate >> 16) & 0xff);
+        header[27] = (byte) ((longSampleRate >> 24) & 0xff);
+        //音频数据传送速率,采样率*通道数*采样深度/8
+        header[28] = (byte) (byteRate & 0xff);
+        header[29] = (byte) ((byteRate >> 8) & 0xff);
+        header[30] = (byte) ((byteRate >> 16) & 0xff);
+        header[31] = (byte) ((byteRate >> 24) & 0xff);
+        // 确定系统一次要处理多少个这样字节的数据，确定缓冲区，通道数*采样位数
+        header[32] = (byte) (channels * 16 / 8);
+        header[33] = 0;
+        //每个样本的数据位数
+        header[34] = 16;
+        header[35] = 0;
+        //Data chunk
+        header[36] = 'd';//data
+        header[37] = 'a';
+        header[38] = 't';
+        header[39] = 'a';
+        header[40] = (byte) (totalAudioLen & 0xff);
+        header[41] = (byte) ((totalAudioLen >> 8) & 0xff);
+        header[42] = (byte) ((totalAudioLen >> 16) & 0xff);
+        header[43] = (byte) ((totalAudioLen >> 24) & 0xff);
+        try {
+            out.write(header, 0, 44);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
