@@ -155,6 +155,7 @@ public class MaoAudio {
                 try {
                     DataOutputStream outputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(child)));
                     byte[] bytes = new byte[audioSize];
+
                     audioRecord.startRecording();
                     int r = 0;
                     while (isRecording) {

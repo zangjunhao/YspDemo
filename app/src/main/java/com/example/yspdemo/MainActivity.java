@@ -13,10 +13,15 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.TotalCaptureResult;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
+import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 
@@ -31,7 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private AudioRecord audioRecord;
     private AudioTrack audioTrack;
     private boolean isRecording;
-    File file;
+    private File file;
     private int audioSize;
     private MaoAudio maoAudio;
     private CameraDevice cameraDevice;
@@ -42,12 +47,48 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        CameraNv21();
+        ExtractorTest();
+    }
+
+
+    private void ExtractorTest() {
+        setContentView(R.layout.activity_extractor);
+        MaoExtractor maoExtractor = new MaoExtractor();
+        maoExtractor.extracMedia(this);
+        SurfaceView surfaceView = findViewById(R.id.surface);
+        final SurfaceHolder surfaceHolder = surfaceView.getHolder();
+        final File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/Muxer" + "/muxer.mp4");
+        surfaceHolder.addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                MediaPlayer mediaPlayer;
+                if (file.exists()) {
+//                    mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.testmv);
+                    mediaPlayer = MediaPlayer.create(getApplicationContext(), Uri.fromFile(file));
+                    mediaPlayer.setDisplay(surfaceHolder);
+                    mediaPlayer.start();
+                    Log.d(TAG, "surfaceCreated: ");
+
+                }
+
+
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+
+            }
+        });
     }
 
     @SuppressLint("MissingPermission")
     private void CameraNv21() {
-        setContentView(R.layout.activity_main2);
+        setContentView(R.layout.activity_camera);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
                             Manifest.permission.READ_EXTERNAL_STORAGE,
