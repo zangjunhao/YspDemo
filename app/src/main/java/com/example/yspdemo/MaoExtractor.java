@@ -61,9 +61,9 @@ public class MaoExtractor {
                 break;
             }
             info.offset = 0;
-            info.size = size;
-            info.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
-            info.presentationTimeUs = mediaExtractor.getSampleTime();
+            info.size = size;//数据大小
+            info.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;//是否为关键帧/同步帧
+            info.presentationTimeUs = mediaExtractor.getSampleTime();//时间戳
             mMediaMuxer.writeSampleData(videoTrackIndex,byteBuffer,info);
             mediaExtractor.advance();
         }

@@ -15,6 +15,7 @@ import android.media.AudioRecord;
 import android.media.AudioTrack;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.opengl.GLSurfaceView;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -47,7 +48,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        ExtractorTest();
+        OpenGLTest();
+    }
+
+    private void OpenGLTest(){
+        setContentView(R.layout.activity_opengltest);
+        GLSurfaceView glSurfaceView = findViewById(R.id.glsurface);
+        glSurfaceView.setEGLContextClientVersion(3);
+        GLSurfaceView.Renderer renderer = new OpenGLTriangle();
+        glSurfaceView.setRenderer(renderer);
     }
 
 
