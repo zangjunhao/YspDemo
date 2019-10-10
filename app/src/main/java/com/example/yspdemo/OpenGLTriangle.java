@@ -2,6 +2,7 @@ package com.example.yspdemo;
 
 import android.opengl.GLES30;
 import android.opengl.GLSurfaceView;
+import android.opengl.Matrix;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -12,16 +13,19 @@ import javax.microedition.khronos.opengles.GL10;
 
 public class OpenGLTriangle implements GLSurfaceView.Renderer {
     private float[] trianglePoint = new float[]{//opengl是三维的，分别表示xyz，所以设置z轴为0
-      0.1f,0.1f,0.0f,
-      -0.5f,-0.5f,0.5f,
+      0.0f,0.0f,0.0f,
+      -0.5f,-0.5f,0.0f,
       0.5f,-0.5f,0.0f
     };
+    private int programId;
+    private int uMatrix;
+    private float[] mProjectionMatrix = new float[16];
     private String vertextShader =
             "#version 300 es\n" +
-                    "layout (location = 0) in vec4 vPosition;\n" +//vec4 四整数向量
+                    "uniform mat4 u_Matrix;\n"+
+                    "in vec4 vPosition;\n" +//vec4 四整数向量
                     "void main() {\n" +
-                    "     gl_Position  = vPosition;\n" + //
-                    "     gl_PointSize = 10.0;\n" +
+                    "     gl_Position  = vPosition*u_Matrix;\n" +
                     "}\n";
     private String fragmentShader =
             "#version 300 es\n" +
@@ -61,8 +65,8 @@ public class OpenGLTriangle implements GLSurfaceView.Renderer {
         }
     }
 
-    public static int linkProgram(int vertexShaderId, int fragmentShaderId) {
-        final int programId = GLES30.glCreateProgram();
+    public  int linkProgram(int vertexShaderId, int fragmentShaderId) {
+        programId = GLES30.glCreateProgram();
         if (programId != 0) {
             //将顶点着色器加入到程序
             GLES30.glAttachShader(programId, vertexShaderId);
@@ -97,12 +101,26 @@ public class OpenGLTriangle implements GLSurfaceView.Renderer {
         final int fragmentShaderId = compileShader(GLES30.GL_FRAGMENT_SHADER, fragmentShader);
         //在OpenGLES环境中使用程序
         GLES30.glUseProgram(linkProgram(vertexShaderId, fragmentShaderId));
+        uMatrix = GLES30.glGetUniformLocation(programId,"u_Matrix" );
+
     }
 
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         //设置视图窗口
         GLES30.glViewport(0, 0, width, height);
+        //主要还是长宽进行比例缩放
+        float aspectRatio = width > height ?
+                (float) width / (float) height :
+                (float) height / (float) width;
+
+        if (width > height) {
+            //横屏。需要设置的就是左右。
+            Matrix.orthoM(mProjectionMatrix, 0, -aspectRatio, aspectRatio, -1, 1f, -1.f, 1f);
+        } else {
+            //竖屏。需要设置的就是上下
+            Matrix.orthoM(mProjectionMatrix, 0, -1, 1f, -aspectRatio, aspectRatio, -1.f, 1f);
+        }
     }
 
     @Override
@@ -121,7 +139,7 @@ public class OpenGLTriangle implements GLSurfaceView.Renderer {
         //绘制直线
 //        GLES30.glDrawArrays(GLES30.GL_LINE_STRIP, 0, 2);
 //        GLES30.glLineWidth(10);
-
+        GLES30.glUniformMatrix4fv(uMatrix,1,false,mProjectionMatrix,0);
         //绘制三角形
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3);
 
