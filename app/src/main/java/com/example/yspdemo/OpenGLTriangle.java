@@ -13,9 +13,11 @@ import javax.microedition.khronos.opengles.GL10;
 
 public class OpenGLTriangle implements GLSurfaceView.Renderer {
     private float[] trianglePoint = new float[]{//opengl是三维的，分别表示xyz，所以设置z轴为0
-      0.0f,0.0f,0.0f,
-      -0.5f,-0.5f,0.0f,
-      0.5f,-0.5f,0.0f
+            //Order of coordinates: X, Y, Z, R,G,B,
+            -0.5f, 0.5f, 0.0f, //  0.top left RED
+            -0.5f, -0.5f, 0.0f,  //  1.bottom right Blue
+            0.5f, 0.5f, 0.0f,   //  3.top right WHITE
+            0.5f, -0.5f, 0.0f  //  2.bottom left GREEN
     };
     private int programId;
     private int uMatrix;
@@ -141,7 +143,7 @@ public class OpenGLTriangle implements GLSurfaceView.Renderer {
 //        GLES30.glLineWidth(10);
         GLES30.glUniformMatrix4fv(uMatrix,1,false,mProjectionMatrix,0);
         //绘制三角形
-        GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3);
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4);
 
         //禁止顶点数组的句柄
         GLES30.glDisableVertexAttribArray(0);
