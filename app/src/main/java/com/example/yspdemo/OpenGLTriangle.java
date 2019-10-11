@@ -34,7 +34,7 @@ public class OpenGLTriangle implements GLSurfaceView.Renderer {
                     "precision mediump float;\n" +
                     "out vec4 fragColor;\n" +
                     "void main() {\n" +
-                    "     fragColor = vec4(1.0,1.0,1.0,1.0);\n" +
+                    "     fragColor = vec4( 1, 0, 0,1.0);\n" +
                     "}\n";
     private FloatBuffer buffer;
     public OpenGLTriangle(){

@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        OpenGLTest();
+        MaoCodecTest();
     }
 
     private void OpenGLTest(){
@@ -59,6 +59,16 @@ public class MainActivity extends AppCompatActivity {
         glSurfaceView.setRenderer(renderer);
     }
 
+    private void MaoCodecTest(){
+        setContentView(R.layout.activity_maocodec);
+        final MaoCodec maoCodec = new MaoCodec(this);
+        findViewById(R.id.button_decode).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                maoCodec.decodeMp3();
+            }
+        });
+    }
 
     private void ExtractorTest() {
         setContentView(R.layout.activity_extractor);
