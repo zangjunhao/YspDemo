@@ -27,6 +27,7 @@ import android.view.TextureView;
 import android.view.View;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 
 import androidx.annotation.NonNull;
@@ -62,10 +63,29 @@ public class MainActivity extends AppCompatActivity {
     private void MaoCodecTest(){
         setContentView(R.layout.activity_maocodec);
         final MaoCodec maoCodec = new MaoCodec(this);
+
         findViewById(R.id.button_decode).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                maoCodec.decodeMp3();
+                try {
+                    maoCodec.decodeAacToPcm();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+//                MaoAudio.getSingleAudio().record();
+            }
+        });
+        findViewById(R.id.button_encode).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+//                MaoAudio.getSingleAudio().stop();
+//                maoCodec.startAsync();
+            }
+        });
+        findViewById(R.id.button_play).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                MaoAudio.getSingleAudio().play();
             }
         });
     }

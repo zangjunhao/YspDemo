@@ -70,7 +70,7 @@ public class MaoAudio {
     }
 
     public void play() {
-
+        stop();
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -114,6 +114,7 @@ public class MaoAudio {
                     audioTrack.play();
                     while (true) {
                         int i = 0;
+                        Log.d("maff", "播放pcm中");
                         try {
                             while (dataInputStream.available() > 0 && i < datas.length) {
                                 datas[i] = dataInputStream.readByte();
@@ -162,7 +163,6 @@ public class MaoAudio {
                         int readResult = audioRecord.read(bytes, 0, audioSize);
                         for (int i = 0; i < readResult; i++) {
                             outputStream.write(bytes[i]);
-                            Log.d("maff", "run: " + bytes[i]);
                         }
                         r++;
                     }

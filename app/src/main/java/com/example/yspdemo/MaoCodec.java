@@ -6,28 +6,32 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
-import android.net.rtp.AudioCodec;
+import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.util.Log;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 public class MaoCodec {
     private int audioTrack = -1;
     private Context context;
     private boolean notFinish = true;
+    private File parent = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/AudioRecord");
 
     public MaoCodec(Context context) {
         this.context = context;
     }
 
-    private MediaExtractor getAudioPcm() {
+    private MediaExtractor getAudioPcm() {//提取音轨
         MediaExtractor extractor = new MediaExtractor();
         AssetFileDescriptor afd = context.getResources().openRawResourceFd(R.raw.yp);
         try {
@@ -46,162 +50,212 @@ public class MaoCodec {
         return extractor;
     }
 
-    public void decodeMp3() {
+
+
+    public void startAsync() {
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    MediaExtractor extractor = getAudioPcm();
-                    File parent = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/AudioRecord");
-                    File child = new File(parent, "audio.pcm");
-                    FileOutputStream fos = new FileOutputStream(child);
-                    MediaFormat format = extractor.getTrackFormat(audioTrack);
-                    MediaCodec.BufferInfo inputInfo = new MediaCodec.BufferInfo();
-                    MediaCodec audioCodec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME));
-                    audioCodec.configure(format, null, null, 0);
-                    audioCodec.start();
-                    boolean temp = true;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        while (notFinish) {
-                            int inputIndex = audioCodec.dequeueInputBuffer(0);
-                            if (inputIndex >= 0) {
-                                temp = false;
-                                ByteBuffer inputBuffer = audioCodec.getInputBuffer(inputIndex);
-                                inputBuffer.clear();
-                                int sampleSize = extractor.readSampleData(inputBuffer, 0);
-                                if (sampleSize < 0) {
-                                    audioCodec.queueInputBuffer(inputIndex,
-                                            0,
-                                            0,
-                                            0L,
-                                            MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                                    );
-                                    notFinish = false;
-                                } else {
-                                    inputInfo.offset = 0;
-                                    inputInfo.size = sampleSize;
-                                    inputInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
-                                    inputInfo.presentationTimeUs = extractor.getSampleTime();
-                                    Log.e("maff", "往解码器写入数据，当前时间戳：" + inputInfo.presentationTimeUs);
-                                    //通知MediaCodec解码刚刚传入的数据
-                                    audioCodec.queueInputBuffer(inputIndex, inputInfo.offset, sampleSize, inputInfo.presentationTimeUs, 0);
-                                    extractor.advance();
-                                }
-                            } else {
-                                if (!temp) {
-                                    break;
-                                }
-                            }
-                        }
-
-                        byte[] pcmBytes;
-                        boolean isFinishOut = false;
-                        ByteBuffer outputBuffer = null;
-                        while (!isFinishOut) {
-                            int outputIndex = audioCodec.dequeueOutputBuffer(inputInfo, 0);
-                            if (outputIndex < 0) {
-                                continue;
-                            } else {
-                                outputBuffer = audioCodec.getOutputBuffer(outputIndex);
-                            }
-                            pcmBytes = new byte[inputInfo.size];
-                            outputBuffer.get(pcmBytes);
-                            outputBuffer.clear();
-                            fos.write(pcmBytes);
-                            fos.flush();
-                            Log.e("maff", "释放输出流缓冲区：" + outputIndex);
-                            audioCodec.releaseOutputBuffer(outputIndex, false);
-                            Log.e("maff", "编解码结束");
-                            extractor.release();
-                            audioCodec.stop();
-                            audioCodec.release();
-                            notFinish = false;
-                            isFinishOut = true;
-                        }
-                        fos.close();
-                    } else {
-                        return;
+                    File audioPcm = new File(parent, "audio.pcm");
+                    FileInputStream fis = new FileInputStream(audioPcm);
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] b = new byte[1024];
+                    int n;
+                    while ((n = fis.read(b)) != -1) {
+                        bos.write(b, 0, n);
+                        enCodeAAC(bos.toByteArray());
+                        bos.reset();
                     }
-                } catch (Exception e) {
-
+                    fis.close();
+                    bos.close();
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
         }).start();
     }
 
-    public void enCodeAAC() {
-        File parent = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/AudioRecord");
-        File audioPcm = new File(parent, "audioPcm.pcm");
-        byte[] buffer = new byte[8*1024];
-        byte[] allAudioBytes;
+    public void enCodeAAC(byte[] data) {
 
-        int inputIndex;
-        ByteBuffer inputBuffer;
-        int outputIndex;
-        ByteBuffer outputBuffer;
-
-        byte[] chunkAudio;
-        int outBitSize;
-        int outPacketSize;
-        MediaFormat encodeFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 44100, 2);
-        encodeFormat.setInteger(MediaFormat.KEY_BIT_RATE, 96000);
-        encodeFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
-        encodeFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 500 * 1024);
+        File audioPath = new File(parent, "audioAAC.aac");
+        if(audioPath.exists()){
+            audioPath.delete();
+            try {
+                audioPath.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        FileOutputStream fos = null;
+        BufferedOutputStream bos = null;
         MediaCodec mediaEncode = null;
         try {
-            FileInputStream fis = new FileInputStream(audioPcm);
+            fos = new FileOutputStream(audioPath);
+            bos = new BufferedOutputStream(fos, 500 * 1024);
+            //参数对应-> mime type、采样率、声道数
+            MediaFormat encodeFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 44100, 2);
+            encodeFormat.setInteger(MediaFormat.KEY_BIT_RATE, 64000);//比特率
+            encodeFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+            encodeFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 100 * 1024);
             mediaEncode = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
             mediaEncode.configure(encodeFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-            mediaEncode.start();
-            ByteBuffer[] encodeInputBuffers = mediaEncode.getInputBuffers();
-            ByteBuffer[] encodeOutputBuffers = mediaEncode.getOutputBuffers();
-            MediaCodec.BufferInfo encodeBufferInfo = new MediaCodec.BufferInfo();
-            File audioPath = new File(parent, "audioPcm.aac");
-            //初始化文件写入流
-            FileOutputStream fos = new FileOutputStream(audioPath);
-            BufferedOutputStream bos = new BufferedOutputStream(fos,500 * 1024);
-            boolean isReadEnd = false;
-            while (!isReadEnd){
-                for (int i = 0;i < encodeInputBuffers.length - 1;i++){//减掉1很重要，不要忘记
-                    if (fis.read(buffer) != -1){
-                        allAudioBytes = Arrays.copyOf(buffer,buffer.length);
-                    } else {
-                        Log.e("maff","文件读取完成");
-                        isReadEnd = true;
-                        break;
-                    }
-                    Log.e("maff","读取文件并写入编码器" + allAudioBytes.length);
-                    inputIndex = mediaEncode.dequeueInputBuffer(-1);
-                    inputBuffer = encodeInputBuffers[inputIndex];
-                    inputBuffer.clear();
-                    inputBuffer.limit(allAudioBytes.length);
-                    inputBuffer.put(allAudioBytes);//将pcm数据填充给inputBuffer
-                    mediaEncode.queueInputBuffer(inputIndex,0,allAudioBytes.length,0,0);//开始编码
-                }
-                outputIndex = mediaEncode.dequeueOutputBuffer(encodeBufferInfo,10000);
-                while (outputIndex >= 0){
-                    //从解码器中取出数据
-                    outBitSize = encodeBufferInfo.size;
-                    outPacketSize = outBitSize + 7;//7为adts头部大小
-                    outputBuffer = encodeOutputBuffers[outputIndex];//拿到输出的buffer
-                    outputBuffer.position(encodeBufferInfo.offset);
-                    outputBuffer.limit(encodeBufferInfo.offset + outBitSize);
-                    chunkAudio = new byte[outPacketSize];
-//                    AudioCodec.addADTStoPacket(chunkAudio,outPacketSize);//添加ADTS
-                    outputBuffer.get(chunkAudio,7,outBitSize);//将编码得到的AAC数据取出到byte[]中，偏移量为7
-                    outputBuffer.position(encodeBufferInfo.offset);
-                    Log.e("maff","编码成功并写入文件" + chunkAudio.length);
-                    bos.write(chunkAudio,0,chunkAudio.length);//将文件保存在sdcard中
-                    bos.flush();
-
-                    mediaEncode.releaseOutputBuffer(outputIndex,false);
-                    outputIndex = mediaEncode.dequeueOutputBuffer(encodeBufferInfo,10000);
-                }
-            }
-            mediaEncode.stop();
-            mediaEncode.release();
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
+        mediaEncode.start();
+        ByteBuffer[] encodeInputBuffers = mediaEncode.getInputBuffers();
+        ByteBuffer[] encodeOutputBuffers = mediaEncode.getOutputBuffers();
+        MediaCodec.BufferInfo encodeBufferInfo = new MediaCodec.BufferInfo();
+        int inputIndex = mediaEncode.dequeueInputBuffer(-1);//获取输入缓存的index
+        if (inputIndex >= 0) {
+            ByteBuffer inputByteBuf = encodeInputBuffers[inputIndex];
+            inputByteBuf.clear();
+            inputByteBuf.put(data);//添加数据
+            inputByteBuf.limit(data.length);//限制ByteBuffer的访问长度
+            mediaEncode.queueInputBuffer(inputIndex, 0, data.length, 0, 0);//把输入缓存塞回去给MediaCodec
+        }
+
+        int outputIndex = mediaEncode.dequeueOutputBuffer(encodeBufferInfo, 0);//获取输出缓存的index
+        while (outputIndex >= 0) {
+            //获取缓存信息的长度
+            int byteBufSize = encodeBufferInfo.size;
+            //添加ADTS头部后的长度
+            int bytePacketSize = byteBufSize + 7;
+            //拿到输出Buffer
+            ByteBuffer outPutBuf = encodeOutputBuffers[outputIndex];
+            outPutBuf.position(encodeBufferInfo.offset);
+            outPutBuf.limit(encodeBufferInfo.offset + encodeBufferInfo.size);
+
+            byte[] targetByte = new byte[bytePacketSize];
+            //添加ADTS头部
+            addADTStoPacket(targetByte, bytePacketSize);
+            /*
+            get（byte[] dst,int offset,int length）:ByteBuffer从position位置开始读，读取length个byte，并写入dst下
+            标从offset到offset + length的区域
+             */
+            outPutBuf.get(targetByte, 7, byteBufSize);
+
+            outPutBuf.position(encodeBufferInfo.offset);
+
+            try {
+                bos.write(targetByte);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            //释放
+            mediaEncode.releaseOutputBuffer(outputIndex, false);
+            outputIndex = mediaEncode.dequeueOutputBuffer(encodeBufferInfo, 0);
+        }
+    }
+
+    public void mediaPlay(Context context) {
+        File AAcFile = new File(parent, "audioAAC.aac");
+        if (AAcFile.exists()) {
+            MediaPlayer mediaPlayer = MediaPlayer.create(context, Uri.fromFile(AAcFile));
+            mediaPlayer.start();
+        }
+    }
+
+    public void decodeAacToPcm() throws IOException {
+        File pcmFile = new File(parent, "audio.pcm");
+        File aacFile = new File(parent, "audioAAC.aac");
+        MediaExtractor extractor = getAudioPcm();
+//        extractor.setDataSource(aacFile.getAbsolutePath());
+        MediaFormat mediaFormat = null;
+        for (int i = 0; i < extractor.getTrackCount(); i++) {
+            MediaFormat format = extractor.getTrackFormat(i);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            if (mime.startsWith("audio/")) {
+                extractor.selectTrack(i);
+                mediaFormat = format;
+                break;
+            }
+        }
+        if (mediaFormat == null) {
+            extractor.release();
+            return;
+        }
+
+        FileOutputStream fosDecoder = new FileOutputStream(pcmFile);
+        String mediaMime = mediaFormat.getString(MediaFormat.KEY_MIME);
+        MediaCodec codec = MediaCodec.createDecoderByType(mediaMime);
+        codec.configure(mediaFormat, null, null, 0);
+        codec.start();
+        ByteBuffer[] codecInputBuffers = codec.getInputBuffers();
+        ByteBuffer[] codecOutputBuffers = codec.getOutputBuffers();
+        final long kTimeOutUs = 10_000;
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        boolean sawInputEOS = false;
+        boolean sawOutputEOS = false;
+
+        try {
+            while (!sawOutputEOS) {
+                if (!sawInputEOS) {
+                    int inputBufIndex = codec.dequeueInputBuffer(kTimeOutUs);
+                    if (inputBufIndex >= 0) {
+                        ByteBuffer dstBuf = codecInputBuffers[inputBufIndex];
+                        int sampleSize = extractor.readSampleData(dstBuf, 0);
+                        if (sampleSize < 0) {
+                            sawInputEOS = true;
+                            codec.queueInputBuffer(inputBufIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        } else {
+                            codec.queueInputBuffer(inputBufIndex, 0, sampleSize, extractor.getSampleTime(), 0);
+                            extractor.advance();
+                        }
+                    }
+                }
+
+                int outputBufferIndex = codec.dequeueOutputBuffer(info, kTimeOutUs);
+                if (outputBufferIndex >= 0) {
+                    // Simply ignore codec config buffers.
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                        codec.releaseOutputBuffer(outputBufferIndex, false);
+                        continue;
+                    }
+
+                    if (info.size != 0) {
+                        ByteBuffer outBuf = codecOutputBuffers[outputBufferIndex];
+                        outBuf.position(info.offset);
+                        outBuf.limit(info.offset + info.size);
+                        byte[] data = new byte[info.size];
+                        outBuf.get(data);
+                        fosDecoder.write(data);
+                    }
+
+                    codec.releaseOutputBuffer(outputBufferIndex, false);
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        sawOutputEOS = true;
+                    }
+                } else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
+                    codecOutputBuffers = codec.getOutputBuffers();
+                } else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    MediaFormat oformat = codec.getOutputFormat();
+                }
+            }
+        } finally {
+            codec.stop();
+            codec.release();
+            extractor.release();
+            fosDecoder.close();
+        }
+    }
+
+    private void addADTStoPacket(byte[] packet, int packetLen) {
+        int profile = 2; // AAC LC
+        int freqIdx = 4; // 44.1KHz
+        int chanCfg = 2; // CPE
+
+
+        // fill in ADTS data
+        packet[0] = (byte) 0xFF;
+        packet[1] = (byte) 0xF9;
+        packet[2] = (byte) (((profile - 1) << 6) + (freqIdx << 2) + (chanCfg >> 2));
+        packet[3] = (byte) (((chanCfg & 3) << 6) + (packetLen >> 11));
+        packet[4] = (byte) ((packetLen & 0x7FF) >> 3);
+        packet[5] = (byte) (((packetLen & 7) << 5) + 0x1F);
+        packet[6] = (byte) 0xFC;
     }
 }

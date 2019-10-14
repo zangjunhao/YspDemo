@@ -10,8 +10,28 @@
     android:layout_height="50dp"
     android:text="decode"
     app:layout_constraintLeft_toLeftOf="parent"
-    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintBottom_toTopOf="@id/button_encode"
     app:layout_constraintTop_toTopOf="parent"
     app:layout_constraintRight_toRightOf="parent"
     />
+    <Button
+        android:id="@+id/button_encode"
+        android:layout_width="100dp"
+        android:layout_height="50dp"
+        android:text="encode"
+        app:layout_constraintTop_toBottomOf="@id/button_decode"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/button_play"
+        />
+    <Button
+        android:id="@+id/button_play"
+        android:layout_width="100dp"
+        android:layout_height="50dp"
+        android:text="play"
+        app:layout_constraintTop_toBottomOf="@id/button_encode"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        />
 </androidx.constraintlayout.widget.ConstraintLayout>
